@@ -8,7 +8,6 @@ use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Forms\MultiSelectField;
-use SilverStripe\Forms\Validator;
 use SilverStripe\Model\List\ArrayList;
 use SilverStripe\ORM\DataList;
 use SilverStripe\ORM\DataObject;
@@ -17,6 +16,7 @@ use SilverStripe\ORM\FieldType\DBMultiEnum;
 use SilverStripe\ORM\Relation;
 use SilverStripe\Model\List\SS_List;
 use SilverStripe\Model\ArrayData;
+use SilverStripe\Core\Validation\FieldValidation\MultiOptionFieldValidator;
 
 /**
  * Provides a tagging interface, storing links between tag DataObjects and a parent DataObject.
@@ -26,6 +26,12 @@ use SilverStripe\Model\ArrayData;
  */
 class TagField extends MultiSelectField
 {
+    private static array $field_validators = [
+        // Disable validation as TagField is a special case where labels can be the values
+        // rather than the keys always being the values - for instance when creating new tags
+        MultiOptionFieldValidator::class => null,
+    ];
+
     /**
      * @var array
      */
@@ -560,18 +566,6 @@ class TagField extends MultiSelectField
         }
 
         return array_values($items ?? []);
-    }
-
-    /**
-     * DropdownField assumes value will be a scalar so we must
-     * override validate. This only applies to Silverstripe 3.2+
-     *
-     * @param Validator $validator
-     * @return bool
-     */
-    public function validate($validator)
-    {
-        return $this->extendValidationResult(true, $validator);
     }
 
     /**
