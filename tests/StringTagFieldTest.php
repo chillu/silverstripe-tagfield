@@ -132,13 +132,6 @@ class StringTagFieldTest extends SapphireTest
         $this->assertStringContainsString('suggest', $schema['optionUrl']);
     }
 
-    public function testSchemaIsAddedToAttributes()
-    {
-        $field = new StringTagField('TestField');
-        $attributes = $field->getAttributes();
-        $this->assertNotEmpty($attributes['data-schema']);
-    }
-
     public function testPerformReadonlyTransformation()
     {
         $field = new StringTagField('Tags');

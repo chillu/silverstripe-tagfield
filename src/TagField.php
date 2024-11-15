@@ -381,7 +381,6 @@ class TagField extends MultiSelectField
             [
                 'name' => $name,
                 'style' => 'width: 100%',
-                'data-schema' => json_encode($this->getSchemaData()),
             ]
         );
     }

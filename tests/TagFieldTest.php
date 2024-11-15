@@ -413,6 +413,8 @@ class TagFieldTest extends SapphireTest
         $field = new TagField('Tags', '', TagFieldTestBlogTag::get());
         $field->setTitleField('Title');
         $field->setValue(['Tag1']);
+        $form = new Form();
+        $field->setForm($form);
 
         // When not read only (and not lazy-loading) all source options are returned
         $htmlText = $field->Field();
@@ -480,13 +482,6 @@ class TagFieldTest extends SapphireTest
         $this->assertTrue($schema['lazyLoad']);
         $this->assertTrue($schema['creatable']);
         $this->assertStringContainsString('suggest', $schema['optionUrl']);
-    }
-
-    public function testSchemaIsAddedToAttributes()
-    {
-        $field = new TagField('TestField');
-        $attributes = $field->getAttributes();
-        $this->assertNotEmpty($attributes['data-schema']);
     }
 
     /**
