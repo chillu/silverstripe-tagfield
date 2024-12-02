@@ -7,13 +7,13 @@ use SilverStripe\Control\Controller;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Forms\DropdownField;
-use SilverStripe\Forms\Validator;
 use SilverStripe\Model\List\ArrayList;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\DataObjectInterface;
 use SilverStripe\Model\List\SS_List;
 use SilverStripe\Model\ArrayData;
 use SilverStripe\View\Requirements;
+use SilverStripe\Core\Validation\FieldValidation\OptionFieldValidator;
 
 /**
  * Provides a tagging interface, storing comma-delimited tags in a DataObject string field.
@@ -26,6 +26,12 @@ use SilverStripe\View\Requirements;
  */
 class StringTagField extends DropdownField
 {
+    private static array $field_validators = [
+        // Disable validation as StringTagField is a special case where labels can be the values
+        // rather than the keys always being the values - for instance when creating new tags
+        OptionFieldValidator::class => null,
+    ];
+
     /**
      * @var array
      */
@@ -354,18 +360,6 @@ class StringTagField extends DropdownField
         }
 
         return array_slice(array_values($items ?? []), 0, $this->getLazyLoadItemLimit());
-    }
-
-    /**
-     * DropdownField assumes value will be a scalar so we must
-     * override validate. This only applies to Silverstripe 3.2+
-     *
-     * @param Validator $validator
-     * @return bool
-     */
-    public function validate($validator)
-    {
-        return $this->extendValidationResult(true, $validator);
     }
 
     /**
