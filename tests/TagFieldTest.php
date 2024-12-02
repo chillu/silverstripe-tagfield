@@ -2,10 +2,12 @@
 
 namespace SilverStripe\TagField\Tests;
 
+use ReflectionMethod;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\Form;
+use SilverStripe\ORM\ArrayList;
 use SilverStripe\ORM\DataList;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\TagField\ReadonlyTagField;
@@ -68,6 +70,104 @@ class TagFieldTest extends SapphireTest
         $record->write();
 
         $this->assertEquals($tag->ID, $record->PrimaryTagID, 'The tag is saved to a has_one');
+    }
+
+    /**
+     * @dataProvider rawValueStoreCasesProvider
+     */
+    public function testItSavesToRawValue(bool $rawValueEnabled, mixed $values, mixed $expected): void
+    {
+        $record = $this->getNewTagFieldTestBlogPost('BlogPost1');
+        $tag = new TagFieldTestBlogTag();
+        $tag->Title = 'RawValueTest';
+        $tag->write();
+
+        $field = new TagField('InMemoryOnlyProperty', '', new DataList(TagFieldTestBlogTag::class));
+        $field->setAllowRawValue($rawValueEnabled);
+
+        $field->setValue($values);
+        $field->saveInto($record);
+
+        $this->assertEquals($expected, $record->InMemoryOnlyProperty, 'We expect raw value to be stored');
+    }
+
+    public function rawValueStoreCasesProvider(): array
+    {
+        return [
+            'raw value disabled' => [
+                false,
+                'SampleValue1',
+                null,
+            ],
+            'raw value enabled (single value)' => [
+                true,
+                'SampleValue1',
+                [
+                    'SampleValue1',
+                ],
+            ],
+            'raw value enabled (multiple values)' => [
+                true,
+                [
+                    'SampleValue1',
+                    'SampleValue2',
+                ],
+                [
+                    'SampleValue1',
+                    'SampleValue2',
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider rawValueLoadCasesProvider
+     */
+    public function testItLoadsFromRawValue(bool $rawValueEnabled, mixed $values, mixed $expected): void
+    {
+        $record = $this->getNewTagFieldTestBlogPost('BlogPost1');
+        $tag = new TagFieldTestBlogTag();
+        $tag->Title = 'RawValueTest';
+        $tag->write();
+
+        $field = new TagField('InMemoryOnlyProperty', '', new DataList(TagFieldTestBlogTag::class));
+        $field->setAllowRawValue($rawValueEnabled);
+        $record->InMemoryOnlyProperty = $values;
+
+        $field->loadFrom($record);
+
+        $this->assertEquals($expected, $field->Value(), 'We expect raw value to be loaded');
+    }
+
+    public function rawValueLoadCasesProvider(): array
+    {
+        return [
+            'raw value disabled' => [
+                false,
+                null,
+                [],
+            ],
+            'raw value enabled (single value)' => [
+                true,
+                [
+                    'SampleValue1',
+                ],
+                [
+                    'SampleValue1',
+                ],
+            ],
+            'raw value enabled (multiple values)' => [
+                true,
+                [
+                    'SampleValue1',
+                    'SampleValue2',
+                ],
+                [
+                    'SampleValue1',
+                    'SampleValue2',
+                ],
+            ],
+        ];
     }
 
     /**
@@ -443,6 +543,148 @@ class TagFieldTest extends SapphireTest
         $this->assertFalse(
             $this->getFromOptionsByTitle($schema['options'], $unselectedTag->Title)['Selected']
         );
+    }
+
+    /**
+     * @dataProvider optionCasesProvider
+     */
+    public function testGetOptionsWithConfigurableFields(
+        ?string $titleField,
+        ?string $valueField,
+        array $expected
+    ): void {
+        $source = TagFieldTestBlogTag::get();
+
+        $field = new TagField('TestField', null, $source);
+
+        if ($titleField) {
+            $field->setTitleField($titleField);
+        }
+
+        if ($valueField) {
+            $field->setValueField($valueField);
+        }
+
+        /** @see TagField::getOptions() */
+        $getOptionsMethod = new ReflectionMethod($field, 'getOptions');
+
+        /** @var ArrayList $result */
+        $result = $getOptionsMethod->invoke($field);
+
+        $data = $result
+            ->map('Title', 'Value')
+            ->toArray();
+        $this->assertSame($expected, $data, 'We expect specific fields to be present');
+    }
+
+    public function optionCasesProvider(): array
+    {
+        return [
+            'default fields' => [
+                null,
+                null,
+                [
+                    'Tag1' => 'Tag1',
+                    '222' => '222'
+                ],
+            ],
+            'Label > Sort' => [
+                'Label',
+                'Sort',
+                [
+                    'Label: Tag1' => 2,
+                    'Label: 222' => 1
+                ],
+            ],
+            'Sort > Title' => [
+                'Sort',
+                'Title',
+                [
+                    2 => 'Tag1',
+                    1 => '222'
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @dataProvider getTagsCasesProvider
+     */
+    public function testGetTagsWithConfigurableFields(
+        ?string $titleField,
+        ?string $valueField,
+        ?string $searchField,
+        ?string $sortField,
+        string $searchSubject,
+        array $expected
+    ): void {
+        $tag3 = TagFieldTestBlogTag::create();
+        $tag3->Title = 'Tag3';
+        $tag3->Sort = 3;
+        $tag3->write();
+
+        $source = TagFieldTestBlogTag::get();
+
+        $field = new TagField('TestField', null, $source);
+
+        if ($titleField) {
+            $field->setTitleField($titleField);
+        }
+
+        if ($valueField) {
+            $field->setValueField($valueField);
+        }
+
+        if ($searchField) {
+            $field->setSearchField($searchField);
+        }
+
+        if ($sortField) {
+            $field->setSortField($sortField);
+        }
+
+        /** @see TagField::getTags() */
+        $getTagsMethod = new ReflectionMethod($field, 'getTags');
+
+        /** @var ArrayList $result */
+        $result = $getTagsMethod->invoke($field, $searchSubject);
+        $data = [];
+
+        foreach ($result as $item) {
+            $title = $item['Title'];
+            $value = $item['Value'];
+            $data[$title] = $value;
+        }
+
+        $this->assertSame($expected, $data, 'We expect specific fields to be present');
+    }
+
+    public function getTagsCasesProvider(): array
+    {
+        return [
+            'default fields' => [
+                null,
+                null,
+                null,
+                null,
+                'Tag',
+                [
+                    'Tag1' => 'Tag1',
+                    'Tag3' => 'Tag3',
+                ],
+            ],
+            'custom fields' => [
+                'Label',
+                'Sort',
+                'Title',
+                'Sort',
+                'Tag',
+                [
+                    'Label: Tag1' => 2,
+                     'Label: Tag3' => 3,
+                ],
+            ],
+        ];
     }
 
     public function testGetSchemaDataDefaults()

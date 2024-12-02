@@ -49,9 +49,47 @@ class TagField extends MultiSelectField
     protected $canCreate = true;
 
     /**
+     * This is the field that populates the label displayed in the UI
+     * It can be either a DB field or a model method name
+     *
      * @var string
      */
     protected $titleField = 'Title';
+
+    /**
+     * This is the field that is used to store selected values
+     * It has to be a DB field or null
+     * Use null for the auto-detection
+     *
+     * @var string
+     */
+    protected $valueField = 'Title';
+
+    /**
+     * This is the field which drives the "suggest" action via text-based search
+     * It has to be a DB field
+     *
+     * @var string
+     */
+    protected $searchField = 'Title';
+
+    /**
+     * This is the field which drives the order of results that appear in the "suggest" action via text-based search
+     * It has to be a DB field or empty string
+     * Use empty string to skip order customisation which will result in whatever order the source list is in
+     *
+     * @var string
+     */
+    protected $sortField = 'Title';
+
+    /**
+     * Allow Raw data to be stored on the matching DB field of the model
+     * Use this to cover cases which don't require form level data serialisation
+     * such as MultiValueField (symbiote/silverstripe-multivaluefield)
+     *
+     * @var bool
+     */
+    protected $allowRawValue = false;
 
     /**
      * @var DataList
@@ -71,10 +109,29 @@ class TagField extends MultiSelectField
      * @param null|DataList|array $source
      * @param null|DataList $value
      * @param string $titleField
+     * @param string|null $valueField
+     * @param string|null $searchField
+     * @param string|null $sortField
+     * @param bool $allowRawValue
      */
-    public function __construct($name, $title = '', $source = [], $value = null, $titleField = 'Title')
-    {
-        $this->setTitleField($titleField);
+    public function __construct(
+        $name,
+        $title = '',
+        $source = [],
+        $value = null,
+        $titleField = 'Title',
+        $valueField = null,
+        $searchField = null,
+        $sortField = null,
+        $allowRawValue = false
+    ) {
+        $this
+            ->setTitleField($titleField)
+            ->initValueField($valueField)
+            ->initSearchField($searchField)
+            ->initSortField($sortField)
+            ->setAllowRawValue($allowRawValue);
+
         parent::__construct($name, $title, $source, $value);
 
         $this->addExtraClass('ss-tag-field');
@@ -181,6 +238,82 @@ class TagField extends MultiSelectField
     }
 
     /**
+     * @param string $valueField
+     * @return $this
+     */
+    public function setValueField($valueField)
+    {
+        $this->valueField = $valueField;
+
+        return $this;
+    }
+
+    /**
+     * @return string
+     */
+    public function getValueField()
+    {
+        return $this->valueField;
+    }
+
+    /**
+     * @param $searchField
+     * @return $this
+     */
+    public function setSearchField($searchField)
+    {
+        $this->searchField = $searchField;
+
+        return $this;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSearchField()
+    {
+        return $this->searchField;
+    }
+
+    /**
+     * @param string $fieldName
+     * @return $this
+     */
+    public function setSortField($fieldName)
+    {
+        $this->sortField = $fieldName;
+
+        return $this;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSortField()
+    {
+        return $this->sortField;
+    }
+
+    /**
+     * @param bool $allowRawValue
+     * @return $this
+     */
+    public function setAllowRawValue($allowRawValue)
+    {
+        $this->allowRawValue = $allowRawValue;
+
+        return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function getAllowRawValue()
+    {
+        return $this->allowRawValue;
+    }
+
+    /**
      * Get the DataList source. The 4.x upgrade for SelectField::setSource starts to convert this to an array.
      * If empty use getSource() for array version
      *
@@ -270,7 +403,6 @@ class TagField extends MultiSelectField
         }
 
         $dataClass = $source->dataClass();
-
         $values = $this->getValueArray();
 
         // If we have no values and we only want selected options we can bail here
@@ -279,41 +411,33 @@ class TagField extends MultiSelectField
         }
 
         $titleField = $this->getTitleField();
+        $valueField = $this->getValueField();
 
         // Convert an array of values into a datalist of options
         if (!$values instanceof SS_List) {
             if (is_array($values) && !empty($values)) {
-                // if values is an array of Ids then we should look up via
-                // ID.
-                if (array_filter($values, 'is_int')) {
-                    $queryField = 'ID';
-                } else {
-                    $queryField = $titleField;
-                }
-
-                if (is_a($source, DataList::class)) {
-                    $values = $source->filterAny([
-                        $queryField => $values
-                    ]);
-                } else {
-                    $values = DataList::create($dataClass)
+                $values = is_a($source, DataList::class)
+                    ? $source->filterAny([
+                        $valueField => $values,
+                    ])
+                    : DataList::create($dataClass)
                         ->filterAny([
-                            $queryField => $values
+                            $valueField => $values,
                         ]);
-                }
             } else {
                 $values = ArrayList::create();
             }
         }
 
         // Prep a function to parse a dataobject into an option
-        $addOption = function (DataObject $item) use ($options, $values, $titleField) {
-            $option = $item->$titleField;
+        $addOption = function (DataObject $item) use ($options, $values, $titleField, $valueField) {
+            $title = $item->{$titleField};
+            $value = $item->{$valueField};
 
             $options->push(ArrayData::create([
-                'Title' => $option,
-                'Value' => $option,
-                'Selected' => (bool) $values->find($titleField, $option)
+                'Title' => $title,
+                'Value' => $value,
+                'Selected' => (bool) $values->find($valueField, $value)
             ]));
         };
 
@@ -398,11 +522,11 @@ class TagField extends MultiSelectField
         }
 
         if ($values instanceof SS_List) {
-            return $values->column($this->getTitleField());
+            return $values->column($this->getValueField());
         }
 
         if ($values instanceof DataObject && $values->exists()) {
-            return [$values->{$this->getTitleField()} ?? $values->ID];
+            return [$values->{$this->getValueField()}];
         }
 
         if (is_int($values)) {
@@ -412,15 +536,37 @@ class TagField extends MultiSelectField
         return [trim((string) $values)];
     }
 
+    /**
+     * @param DataObjectInterface $record
+     * @return void
+     */
+    public function loadFrom(DataObjectInterface $record): void
+    {
+        $fieldName = $this->getName();
+
+        if (!$fieldName) {
+            return;
+        }
+
+        if ($this->getAllowRawValue()) {
+            // Load raw value without de-serialisation
+            $this->value = $record->{$fieldName};
+
+            return;
+        }
+
+        parent::loadFrom($record);
+    }
 
     /**
      * {@inheritdoc}
      */
     public function saveInto(DataObjectInterface $record)
     {
-        $name = $this->getName();
+        $fieldName = $this->getName();
         $values = $this->getValueArray();
 
+        // We need to extract IDs as in some cases (Relation) we are unable to use the value field
         $ids = [];
 
         if (!$values) {
@@ -431,37 +577,58 @@ class TagField extends MultiSelectField
             return;
         }
 
-        /** @var Relation $relation */
-        $relation = $record->hasMethod($name) ? $record->$name() : null;
+        $valueField = $this->getValueField();
+        $tag = null;
+        $cleanValues = [];
 
-        foreach ($values as $key => $value) {
+        foreach ($values as $value) {
             $tag = $this->getOrCreateTag($value);
 
-            if ($tag) {
-                $ids[] = $tag->ID;
-                $values[$key] = $tag->Title;
+            if (!$tag) {
+                continue;
             }
+
+            $ids[] = $tag->ID;
+            $cleanValues[] = $tag->{$valueField};
         }
 
+        /** @var Relation $relation */
+        $relation = $record->hasMethod($fieldName)
+            ? $record->$fieldName()
+            : null;
 
         if ($relation instanceof Relation) {
-            // Save ids into relation
+            // Save values into relation
             $relation->setByIDList(array_filter($ids ?? []));
-        } elseif ($record->hasField($name)) {
+        } elseif ($this->getAllowRawValue()) {
+            // Store raw data without serialisation
+            $record->{$fieldName} = $cleanValues;
+        } elseif ($record->hasField($fieldName)) {
             if ($this->getIsMultiple()) {
-                if ($record->obj($name) instanceof DBMultiEnum) {
+                $record->{$fieldName} = $record->obj($fieldName) instanceof DBMultiEnum
                     // Save dataValue into field... a CSV for DBMultiEnum
-                    $record->$name = $this->csvEncode(array_filter(array_values($values)));
-                } else {
+                    ? $this->csvEncode(array_filter(array_values($cleanValues)))
                     // ... JSON-encoded string for other fields
-                    $record->$name = $this->stringEncode(array_filter(array_values($values)));
-                }
+                    : $this->stringEncode(array_filter(array_values($cleanValues)));
             } else {
-                if (isset($tag) && $tag->ID) {
-                    $record->$name = $tag->ID;
-                } else {
-                    $record->$name = null;
+                // Detect has one as this case needs ID as opposed to custom value
+                $relations = $record->hasOne();
+                $hasOneDetected = false;
+
+                foreach ($relations as $relationName => $relationTarget) {
+                    $foreignKey = $relationName . 'ID';
+
+                    if ($foreignKey === $fieldName) {
+                        $hasOneDetected = true;
+
+                        break;
+                    }
                 }
+
+                $targetField = $hasOneDetected ? 'ID' : $valueField;
+                $record->{$fieldName} = $tag && $tag->{$targetField}
+                    ? $tag->{$targetField}
+                    : null;
             }
         }
     }
@@ -481,14 +648,14 @@ class TagField extends MultiSelectField
 
         // Check if existing record can be found
         $source = $this->getSourceList();
-        $titleField = $this->getTitleField();
+        $valueField = $this->getValueField();
 
         if (!$source) {
             return false;
         }
 
         $record = $source
-            ->filter($titleField, $value)
+            ->filter($valueField, $value)
             ->first();
 
         if ($record) {
@@ -499,7 +666,7 @@ class TagField extends MultiSelectField
         if ($this->getCanCreate() && $value) {
             $dataClass = $source->dataClass();
             $record = Injector::inst()->create($dataClass);
-            $record->{$titleField} = $value;
+            $record->{$valueField} = $value;
             $record->write();
 
             if ($source instanceof SS_List) {
@@ -538,25 +705,33 @@ class TagField extends MultiSelectField
     protected function getTags($term)
     {
         $source = $this->getSourceList();
+
         if (!$source) {
             return [];
         }
 
         $titleField = $this->getTitleField();
+        $valueField = $this->getValueField();
+        $searchField = $this->getSearchField();
+        $sortField = $this->getSortField();
 
-        $query = $source
-            ->filter($titleField . ':PartialMatch:nocase', $term)
-            ->sort($titleField)
+        $list = $source
+            ->filter($searchField . ':PartialMatch:nocase', $term)
             ->limit($this->getLazyLoadItemLimit());
+
+        // Optionally apply sort
+        if ($sortField) {
+            $list = $list->sort($searchField);
+        }
 
         // Map into a distinct list
         $items = [];
-        $titleField = $this->getTitleField();
 
-        foreach ($query->map('ID', $titleField)->values() as $title) {
-            $items[$title] = [
-                'Title' => $title,
-                'Value' => $title,
+        foreach ($list as $record) {
+            $value = $record->{$valueField};
+            $items[$value] = [
+                'Title' => $record->{$titleField},
+                'Value' => $value,
             ];
         }
 
@@ -622,5 +797,44 @@ class TagField extends MultiSelectField
         }
 
         return TagField::SCHEMA_DATA_TYPE_SINGLESELECT;
+    }
+
+    /**
+     * Provide a good default for value field
+     *
+     * @param string|null $value
+     * @return $this
+     */
+    protected function initValueField($value)
+    {
+        $value = $value ?? $this->getTitleField();
+
+        return $this->setValueField($value);
+    }
+
+    /**
+     * Provide a good default for search field
+     *
+     * @param string|null $value
+     * @return $this
+     */
+    protected function initSearchField($value)
+    {
+        $value = $value ?? $this->getTitleField();
+
+        return $this->setSearchField($value);
+    }
+
+    /**
+     * Provide a good default for sort field
+     *
+     * @param string|null $value
+     * @return $this
+     */
+    protected function initSortField($value)
+    {
+        $value = $value ?? $this->getSearchField();
+
+        return $this->setSortField($value);
     }
 }

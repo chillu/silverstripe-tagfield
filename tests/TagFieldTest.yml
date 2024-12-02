@@ -1,11 +1,13 @@
 SilverStripe\TagField\Tests\Stub\TagFieldTestBlogTag:
   Tag1:
-    Title: Tag1
+    Title: 'Tag1'
+    Sort: 2
   Tag2:
-    Title: 222
+    Title: '222'
+    Sort: 1
 SilverStripe\TagField\Tests\Stub\TagFieldTestBlogPost:
   BlogPost1:
-    Title: BlogPost1
+    Title: 'BlogPost1'
   BlogPost2:
-    Title: BlogPost2
+    Title: 'BlogPost2'
     Tags: =>SilverStripe\TagField\Tests\Stub\TagFieldTestBlogTag.Tag1,=>SilverStripe\TagField\Tests\Stub\TagFieldTestBlogTag.Tag2
