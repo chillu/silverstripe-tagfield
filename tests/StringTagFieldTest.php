@@ -140,18 +140,18 @@ class StringTagFieldTest extends SapphireTest
         // Ensure a single value can be rendered
         $field->setValue(['Test2']);
         $field_readonly = $field->performReadonlyTransformation();
-        $this->assertEquals('Test2', $field_readonly->Value());
+        $this->assertEquals('Test2', $field_readonly->getValue());
 
         // Ensure multiple valid values are rendered
         $field->setValue(['Test1', 'Test2']);
         $field_readonly = $field->performReadonlyTransformation();
-        $this->assertEquals('Test1, Test2', $field_readonly->Value());
+        $this->assertEquals('Test1, Test2', $field_readonly->getValue());
 
         // Ensure an value not in the source array is still rendered
         // (because e.g. in history view it must have been a valid value when it was set)
         $field->setValue(['Test', 'Test1']);
         $field_readonly = $field->performReadonlyTransformation();
-        $this->assertEquals('Test, Test1', $field_readonly->Value());
+        $this->assertEquals('Test, Test1', $field_readonly->getValue());
     }
 
     /**

@@ -337,7 +337,7 @@ class TagFieldTest extends SapphireTest
 
         $ids = TagFieldTestBlogTag::get()->column('ID');
 
-        $this->assertEquals($field->Value(), $ids);
+        $this->assertEquals($field->getValue(), $ids);
     }
 
     public function testItIgnoresNewTagsIfCannotCreate()
