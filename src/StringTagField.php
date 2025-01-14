@@ -173,7 +173,7 @@ class StringTagField extends DropdownField
                 'lazyLoad' => $this->getShouldLazyLoad(),
                 'creatable' => $this->getCanCreate(),
                 'multi' => $this->getIsMultiple(),
-                'value' => $this->formatOptions($this->Value()),
+                'value' => $this->formatOptions($this->getValue()),
                 'disabled' => $this->isDisabled() || $this->isReadonly(),
             ]
         );
@@ -384,7 +384,7 @@ class StringTagField extends DropdownField
     public function performReadonlyTransformation()
     {
         $field = parent::performReadonlyTransformation();
-        $field->setValue(implode(', ', $this->Value()));
+        $field->setValue(implode(', ', $this->getValue()));
         return $field;
     }
 }
